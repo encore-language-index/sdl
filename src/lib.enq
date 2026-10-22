@@ -1,0 +1,243 @@
+//! SDL3 platform windows and input. All operations belong to the main thread.
+//! Close windows explicitly. Copies share a checked token; closing invalidates
+//! every copy. Native interop is borrowed and deliberately unsafe.
+import core::result::Result
+
+extern fn encore_sdl_window_create(title: str, width: u32, height: u32, mode: u32) -> usize
+extern fn encore_sdl_window_close(handle: usize) -> bool
+extern fn encore_sdl_window_native(handle: usize) -> usize
+extern fn encore_sdl_window_show(handle: usize) -> bool
+extern fn encore_sdl_window_size(handle: usize, component: u32) -> u32
+extern fn encore_sdl_window_scale(handle: usize) -> f32
+extern fn encore_sdl_text_input(handle: usize, enabled: bool) -> bool
+extern fn encore_sdl_relative_mouse(handle: usize, enabled: bool) -> bool
+extern fn encore_sdl_cursor(handle: usize, kind: u32) -> bool
+extern fn encore_sdl_clipboard_set(text: str) -> bool
+extern fn encore_sdl_clipboard_get() -> str
+extern fn encore_sdl_error() -> str
+extern fn encore_sdl_event(handle: usize, timeout: i32) -> u32
+extern fn encore_sdl_event_number(handle: usize, field: u32) -> f32
+extern fn encore_sdl_event_integer(handle: usize, field: u32) -> u32
+extern fn encore_sdl_event_text(handle: usize) -> str
+extern fn encore_sdl_wait_any(timeout_ms: i32) -> bool
+
+/// Sleeps until any registered window has input. Events remain in their owning
+/// window's queue; zero polls and -1 waits without a deadline.
+#attr(safe)
+pub fn wait_any(timeout_ms: i32) -> bool {
+    unsafe { ret encore_sdl_wait_any(timeout_ms) }
+}
+
+/// The window capability is selected before creation, independently of a renderer.
+pub enum Graphics {
+    None
+    Vulkan
+    OpenGL
+    Metal
+}
+pub struct Error {
+    message: str
+}
+pub struct Size {
+    width: u32 height: u32
+}
+pub struct Point {
+    x: f32 y: f32
+}
+pub struct Motion {
+    position: Point delta: Point
+}
+pub struct Button {
+    position: Point button: u32
+}
+pub struct Key {
+    code: u32 scancode: u32 modifiers: u32 repeat: bool
+}
+pub enum Event {
+    None
+    Quit
+    Close
+    Exposed
+    Resized(Size)
+    PixelsResized(Size)
+    FocusLost
+    PointerMoved(Motion)
+    PointerDown(Button)
+    PointerUp(Button)
+    Wheel(Motion)
+    KeyDown(Key)
+    KeyUp(Key)
+    Text(str)
+    Other(u32)
+}
+pub struct Window {
+    handle: usize
+}
+impl for Window {
+    /// Creates a hidden, resizable high-DPI window. Call show after the first frame.
+    pub fn create(title: str, width: u32, height: u32, graphics: Graphics) -> Result[Self, Error] {
+        let mode = match graphics {
+            Graphics::None => 0_u32 Graphics::Vulkan => 1_u32 Graphics::OpenGL => 2_u32 Graphics::Metal => 3_u32
+        }
+        let handle = encore_sdl_window_create(title, width, height, mode)
+        if handle == 0 {
+            ret Result::Err(Error {
+                    encore_sdl_error()
+                }
+            )
+        }
+        ret Result::Ok(Self {
+                handle
+            }
+        )
+    }
+    pub fn close(self: Self) -> bool {
+        ret encore_sdl_window_close(self.handle)
+    }
+    pub fn show(self: Self) -> bool {
+        ret encore_sdl_window_show(self.handle)
+    }
+    pub fn size(self: Self) -> Size {
+        ret Size {
+            encore_sdl_window_size(self.handle, 0), encore_sdl_window_size(self.handle, 1)
+        }
+    }
+    pub fn pixel_size(self: Self) -> Size {
+        ret Size {
+            encore_sdl_window_size(self.handle, 2), encore_sdl_window_size(self.handle, 3)
+        }
+    }
+    pub fn pixel_density(self: Self) -> f32 {
+        ret encore_sdl_window_scale(self.handle)
+    }
+    pub fn text_input(self: Self, enabled: bool) -> bool {
+        ret encore_sdl_text_input(self.handle, enabled)
+    }
+    pub fn relative_mouse(self: Self, enabled: bool) -> bool {
+        ret encore_sdl_relative_mouse(self.handle, enabled)
+    }
+    pub fn cursor(self: Self, kind: u32) -> bool {
+        ret encore_sdl_cursor(self.handle, kind)
+    }
+    /// Borrowed SDL_Window pointer. Never destroy it or retain it beyond close.
+    pub fn native_handle(self: Self) -> usize {
+        ret encore_sdl_window_native(self.handle)
+    }
+    /// Stable checked identity for platform adapters; not a pointer.
+    pub fn identity(self: Self) -> usize {
+        ret self.handle
+    }
+    pub fn poll(self: Self) -> Event {
+        ret self.wait(0)
+    }
+    /// -1 blocks until an event. Positive values are milliseconds, zero polls.
+    pub fn wait(self: Self, timeout_ms: i32) -> Event {
+        let kind = encore_sdl_event(self.handle, timeout_ms)
+        let point = Point {
+            encore_sdl_event_number(self.handle, 0), encore_sdl_event_number(self.handle, 1)
+        }
+        let delta = Point {
+            encore_sdl_event_number(self.handle, 2), encore_sdl_event_number(self.handle, 3)
+        }
+        let first = encore_sdl_event_integer(self.handle, 0)
+        let second = encore_sdl_event_integer(self.handle, 1)
+        match kind {
+            0 => {
+                ret Event::None
+            }
+            256 => {
+                ret Event::Quit
+            }
+            528 => {
+                ret Event::Close
+            }
+            516 => {
+                ret Event::Exposed
+            }
+            518 => {
+                ret Event::Resized(Size {
+                        first, second
+                    }
+                    ,
+                )
+            }
+            519 => {
+                ret Event::PixelsResized(Size {
+                        first, second
+                    }
+                    ,
+                )
+            }
+            527 => {
+                ret Event::FocusLost
+            }
+            1024 => {
+                ret Event::PointerMoved(Motion {
+                        point, delta
+                    }
+                    ,
+                )
+            }
+            1025 => {
+                ret Event::PointerDown(Button {
+                        point, first
+                    }
+                    ,
+                )
+            }
+            1026 => {
+                ret Event::PointerUp(Button {
+                        point, first
+                    }
+                    ,
+                )
+            }
+            1027 => {
+                ret Event::Wheel(Motion {
+                        point, delta
+                    }
+                    ,
+                )
+            }
+            768 => {
+                ret Event::KeyDown(Key {
+                        first, second, encore_sdl_event_integer(self.handle, 2), encore_sdl_event_integer(self.handle, 3) != 0
+                    }
+                    ,
+                )
+            }
+            769 => {
+                ret Event::KeyUp(Key {
+                        first, second, encore_sdl_event_integer(self.handle, 2), encore_sdl_event_integer(self.handle, 3) != 0
+                    }
+                    ,
+                )
+            }
+            771 => {
+                ret Event::Text(encore_sdl_event_text(self.handle))
+            }
+            _ => {
+                ret Event::Other(kind)
+            }
+        }
+    }
+}
+pub fn set_clipboard(text: str) -> bool {
+    ret encore_sdl_clipboard_set(text)
+}
+pub fn clipboard() -> str {
+    ret encore_sdl_clipboard_get()
+}
+pub fn last_error() -> Error {
+    ret Error {
+        encore_sdl_error()
+    }
+}
+
+#attr(test)
+fn invalid_dimensions_are_rejected() -> bool {
+    ret match Window::create("invalid", 0, 10, Graphics::None) {
+        Result::Err(_) => true
+        Result::Ok(_) => false
+    }
+}

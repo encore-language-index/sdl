@@ -1,0 +1,4 @@
+[project]
+name = "sdl_window"
+version = "0.1.0"
+dependencies = ["index@sdl@0.1.0"]

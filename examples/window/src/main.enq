@@ -1,0 +1,31 @@
+//! A platform-only window. No Vulkan or Luma dependency.
+import core::result::Result
+import sdl::{Window, Graphics, Event}
+fn main() -> u32 {
+    let window = match Window::create("SDL platform", 480, 320, Graphics::None) {
+        Result::Ok(value) => value
+        Result::Err(_) => {
+            ret 1
+        }
+    }
+    window.text_input(true)
+    window.show()
+    let mut open = true
+    while open {
+        match window.wait( - 1) {
+            Event::Quit => {
+                open = false
+            }
+            Event::Close => {
+                open = false
+            }
+            _ => {
+            }
+        }
+    }
+    ret if window.close() {
+        0
+    } else {
+        2
+    }
+}

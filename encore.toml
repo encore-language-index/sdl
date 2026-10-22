@@ -1,0 +1,12 @@
+[project]
+name = "sdl"
+version = "0.1.0"
+encore = ">=0.1.6"
+description = "SDL3 windows, events and native interoperability"
+licence = "MIT"
+dependencies = [
+    "sys@core",
+]
+
+[publish]
+exclude = ["target/**", "**/target/**", "**/.encore_cache/**", "encore.lock"]
