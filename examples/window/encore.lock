@@ -1,0 +1,14 @@
+version = 2
+
+[[packages]]
+name = "sdl"
+ref = "index@sdl@>=0.1.0"
+version = "0.1.0"
+archive = "http://127.0.0.1:8137/archives/fdefa574e8ef5770c5912d5102aaffa4d4d0ef7ce263ffa665026675d6ce3a96.tar.gz"
+checksum = "fdefa574e8ef5770c5912d5102aaffa4d4d0ef7ce263ffa665026675d6ce3a96"
+registry = "http://127.0.0.1:8137/index"
+
+[[packages]]
+name = "core"
+ref = "sys@core"
+version = "0.0.0"
